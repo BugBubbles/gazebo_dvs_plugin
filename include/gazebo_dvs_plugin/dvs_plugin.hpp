@@ -31,24 +31,39 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
-*/
+ */
 
 #ifndef DVS_PLUGIN_HPP
 #define DVS_PLUGIN_HPP
 
+#ifdef _WIN32
+// Ensure that Winsock2.h is included before Windows.h, which can get
+// pulled in by anybody (e.g., Boost).
+#include <Winsock2.h>
+#endif
+
 #include <string>
+
 #include <ros/ros.h>
+#include <ros/console.h>
 
 #include <gazebo/common/Plugin.hh>
 #include <gazebo/sensors/CameraSensor.hh>
+#include <gazebo/sensors/DepthCameraSensor.hh>
 #include <gazebo/rendering/Camera.hh>
-#include <gazebo/util/system.hh>
-
+#include <gazebo/rendering/DepthCamera.hh>
 
 #include <dvs_msgs/Event.h>
 #include <dvs_msgs/EventArray.h>
-#include <opencv2/opencv.hpp>
 
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/Imu.h>
+
+#include <cmath>
+#include <opencv2/opencv.hpp>
+#include <cv_bridge/cv_bridge.h>
+
+#include <gazebo_dvs_plugin/esim.hpp>
 using namespace std;
 using namespace cv;
 
@@ -56,34 +71,50 @@ namespace gazebo
 {
   class GAZEBO_VISIBLE DvsPlugin : public SensorPlugin
   {
-    public: DvsPlugin();
+  public:
+    DvsPlugin();
+    ~DvsPlugin();
+    void Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf);
 
-    public: ~DvsPlugin();
+  protected:
+    virtual void mainCallback(const unsigned char *_image,
+                              unsigned int _width, unsigned int _height,
+                              unsigned int _depth, const string &_format);
 
-    public: void Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf);
+  protected:
+    unsigned int width, height, depth;
+    string format;
 
-    protected: virtual void OnNewFrame(const unsigned char *_image,
-                   unsigned int _width, unsigned int _height,
-                   unsigned int _depth, const string &_format);
+    sensors::CameraSensorPtr parentCameraSensor;
+    rendering::CameraPtr camera;
+    // interpolate start time and end time between frames
+    ros::Time last_time_, current_time_;
 
-    protected: unsigned int width, height, depth;
-    protected: string format;
+    event::ConnectionPtr newFrameConnection;
 
-    protected: sensors::CameraSensorPtr parentSensor;
-    protected: rendering::CameraPtr camera;
+    ros::NodeHandle node_handle_;
+    ros::Publisher event_pub_;
+    string namespace_;
 
-    private: event::ConnectionPtr newFrameConnection;
+    // for imu and depth data accquisition
+    ros::Subscriber imu_sub_, dep_sub_;
+    // depth image
+    sensor_msgs::Image dep_img_;
+    // store a sequence of imu messages for ESIM computing.
+    sensor_msgs::Imu imu_msg_;
 
-    protected: ros::NodeHandle node_handle_;
-    protected: ros::Publisher event_pub_;
-    protected: string namespace_;
+  private:
+    Mat last_image;
+    bool has_last_image,imu_cali_flag;
+    float event_threshold;
+    Esim esim;
 
-    private: Mat last_image;
-    private: bool has_last_image;
-    private: float event_threshold;
-    private: void processDelta(Mat *last_image, Mat *curr_image);
-    private: void fillEvents(Mat *diff, int polarity, vector<dvs_msgs::Event> *events);
-    private: void publishEvents(vector<dvs_msgs::Event> *events);
+  private:
+    void imuCallback(const sensor_msgs::Imu::ConstPtr &msg);
+    void processDelta(Mat *last_image, Mat *curr_image, vector<dvs_msgs::Event> *events);
+    void fillEvents(Mat *diff, int polarity, vector<dvs_msgs::Event> *events);
+    void publishEvents(vector<dvs_msgs::Event> *events);
+    void depthCallback(const sensor_msgs::ImageConstPtr &msg);
   };
 }
 #endif
