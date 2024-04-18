@@ -114,3 +114,17 @@ keywords={automobiles;cameras;complex networks;feedforward neural nets;learning 
 doi={10.1109/SIMPAR.2016.7862386},
 month={Dec},}
 ```
+We also thank `ESIM: an Open Event Camera Simulator` for their theoritical support, please cite there paper if you use this code.
+
+```
+@inproceedings{rebecqESIMOpenEvent2018,
+  title = {{{ESIM}}: An {{Open Event Camera Simulator}}},
+  booktitle = {Conference on Robot Learning},
+  author = {Rebecq, Henri and Gehrig, Daniel and Scaramuzza, Davide},
+  date = {2018},
+  pages = {969--982},
+  publisher = {PMLR},
+  location = {Zurich, Switzerland},
+  eventtitle = {2nd {{Conference}} on {{Robot Learning}} ({{CoRL}} 2018)},
+}
+```

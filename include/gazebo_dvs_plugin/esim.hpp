@@ -50,7 +50,6 @@
 #include <gazebo/rendering/DepthCamera.hh>
 #include <gazebo/common/Plugin.hh>
 
-
 class GAZEBO_VISIBLE Esim
 {
 public:
@@ -73,6 +72,7 @@ public:
   ~Esim();
 
   void simulateESIM(cv::Mat *last_iamge, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events, const sensor_msgs::Imu &imu_msg, sensor_msgs::Image &msg_dep_img, const ros::Time &current_time, const ros::Time &last_time);
+  void simulateESIM(cv::Mat *last_iamge, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events, const ros::Time &current_time, const ros::Time &last_time);
 
   void imuCalibration(const std::vector<sensor_msgs::Imu> *imu_msg);
 
@@ -86,6 +86,7 @@ private:
   void lightChange(const float last_pixel, const float curr_pixel, const float f_time_interval, float *delta_pixel);
 
   void adaptiveSample(const cv::Mat *last_image, const cv::Mat *curr_image, const float *curr_dep_img_, const float f_time_interval, float *min_t_v, float *min_t_b);
+  void adaptiveSample(const cv::Mat *last_image, const cv::Mat *curr_image, const float f_time_interval, float *min_t_b);
 
   void processDelta(cv::Mat *last_image, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events);
 

@@ -128,9 +128,6 @@ namespace gazebo
     // Make sure the parent sensors are active
     this->parentCameraSensor->SetActive(true);
 
-    this->imu_sub_ = this->node_handle_.subscribe("/imu", 1000, &DvsPlugin::imuCallback, this);
-    this->dep_sub_ = this->node_handle_.subscribe("/camera/depth/image_raw", 1000, &DvsPlugin::depthCallback, this);
-
     // Initialize the publisher that publishes the IMU data
     this->esim = Esim(this->event_threshold, this->width, this->height);
   }
@@ -206,7 +203,7 @@ float dt = 1.0 / rate;
       {
         std::vector<dvs_msgs::Event> events;
         // this->processDelta(&this->last_image, &curr_image,  &events);
-        this->esim.simulateESIM(&this->last_image, &curr_image, &events, this->imu_msg_, this->dep_img_, this->current_time_, this->last_time_);
+        this->esim.simulateESIM(&this->last_image, &curr_image, &events, this->current_time_, this->last_time_);
 
         this->last_time_ = this->current_time_;
         this->publishEvents(&events);

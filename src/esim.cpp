@@ -173,7 +173,38 @@ void Esim::simulateESIM(cv::Mat *last_iamge, const cv::Mat *curr_image, std::vec
     }
   }
 }
+void Esim::simulateESIM(cv::Mat *last_iamge, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events,const ros::Time &current_time, const ros::Time &last_time)
+{
+  cv::Mat last_image_ = this->mem_last_image.clone();
+  cv::Mat curr_image_ = curr_image->clone();
 
+  float f_time_interval = current_time.toSec() - last_time.toSec();
+
+  curr_image_.convertTo(curr_image_, CV_32F);
+
+  float max_t_l;
+  this->adaptiveSample(&last_image_, &curr_image_, f_time_interval, &max_t_l);
+  float lambda_b = 0.5;
+  // the sample interval between two events for events generation is 1 us.
+  float t_sample_interval = lambda_b * max_t_l;
+  // caculate the slope matrix between the two frames
+  cv::Mat slope = (curr_image_ - this->mem_last_image) / f_time_interval;
+
+  // convert to log intensity to store the last time after event was created
+  if (t_sample_interval >= f_time_interval)
+  {
+    this->processDelta(&this->mem_last_image, &curr_image_, events);
+  }
+  else
+  {
+    for (int iter_num = 0; iter_num < static_cast<int>(f_time_interval / t_sample_interval); iter_num++)
+    {
+      // convert to log intensity to store the current image during the interpolation
+      last_image_ += slope * t_sample_interval;
+      this->processDelta(&this->mem_last_image, &last_image_, events);
+    }
+  }
+}
 // last_image : the last time after event was created
 // curr_image : the current image
 // this function will change the last_image in accordance with events activation after the event was created
@@ -247,6 +278,24 @@ void Esim::adaptiveSample(const cv::Mat *last_image, const cv::Mat *curr_image, 
 
   // max_t_b is the change of the light intensity between the two frames
   *max_t_v = static_cast<float>(1 / temp_max_t_v);
+  *max_t_l = static_cast<float>(1 / temp_max_t_l);
+}
+
+void Esim::adaptiveSample(const cv::Mat *last_image, const cv::Mat *curr_image,  const float f_time_interval, float *max_t_l)
+{
+  cv::Mat last_image_(last_image->size(), CV_32F), temp_image_(last_image->size(), CV_32F);
+  // calculate the light change between the two frames
+  last_image_.forEach<float>([&](float &p, const int *position) -> void
+                             {
+       float l1 = last_image->at<float>(position[0], position[1]);                       
+    float l2 = curr_image->at<float>(position[0], position[1]);
+    this->lightChange(l1, l2, f_time_interval, &p); });
+  double temp_max_t_l, min_;
+  cv::Point min_loc, max_loc;
+  // get the minimum value of the two
+  cv::minMaxLoc(last_image_, &min_, &temp_max_t_l, &min_loc, &max_loc);
+
+  // max_t_b is the change of the light intensity between the two frames
   *max_t_l = static_cast<float>(1 / temp_max_t_l);
 }
 
