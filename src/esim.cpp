@@ -36,12 +36,6 @@
 // Constructor
 Esim::Esim()
 {
-  velocity.x = 0;
-  velocity.y = 0;
-  velocity.z = 0;
-  angular_velocity.x = 0;
-  angular_velocity.y = 0;
-  angular_velocity.z = 0;
   last_time = ros::Time::now();
   event_threshold = 10.0;
   mem_last_image = cv::Mat::ones(0, 0, CV_32F);
@@ -49,12 +43,6 @@ Esim::Esim()
 
 Esim::Esim(float event_threshold, int width, int height)
 {
-  velocity.x = 0;
-  velocity.y = 0;
-  velocity.z = 0;
-  angular_velocity.x = 0;
-  angular_velocity.y = 0;
-  angular_velocity.z = 0;
   this->event_threshold = event_threshold;
   last_time = ros::Time::now();
   mem_last_image = cv::Mat::ones(width, height, CV_32F);
@@ -66,48 +54,6 @@ Esim::~Esim()
 {
 }
 
-// calibrate the static bias of the imu
-void Esim::imuCalibration(const std::vector<sensor_msgs::Imu> *imu_msgs)
-{
-  int imu_msg_size = imu_msgs->size();
-  int amount = imu_msg_size;
-  // 使用最小二乘的回归计算偏置和倍缩，但是倍缩必须在标准速度下校准，这里做不出来，就用时漂去平替它
-  float sum_w_x = 0, sum_w_y = 0, sum_w_z = 0;
-  float sum_a_x = 0, sum_a_y = 0, sum_a_z = 0;
-  for (int i = 0; i < imu_msg_size; i++)
-  {
-    if (imu_msgs->at(i).linear_acceleration_covariance[0] < 0 || imu_msgs->at(i).angular_velocity_covariance[0] < 0)
-    {
-      amount--;
-      continue;
-    }
-    sum_w_x += imu_msgs->at(i).angular_velocity.x;
-    sum_w_y += imu_msgs->at(i).angular_velocity.y;
-    sum_w_z += imu_msgs->at(i).angular_velocity.z;
-
-    sum_a_x += imu_msgs->at(i).linear_acceleration.x;
-    sum_a_y += imu_msgs->at(i).linear_acceleration.y;
-    sum_a_z += imu_msgs->at(i).linear_acceleration.z;
-  }
-
-  this->bias_w_x = sum_w_x / amount;
-  this->bias_w_y = sum_w_y / amount;
-  this->bias_w_z = sum_w_z / amount;
-
-  this->bias_a_x = sum_a_x / amount;
-  this->bias_a_y = sum_a_y / amount;
-  this->bias_a_z = sum_a_z / amount;
-}
-void Esim::imuReoutput(const sensor_msgs::Imu &imu_msg, sensor_msgs::Imu &imu_msg_out)
-{
-
-  imu_msg_out.linear_acceleration.x = imu_msg.linear_acceleration.x - this->bias_a_x;
-  imu_msg_out.linear_acceleration.y = imu_msg.linear_acceleration.y - this->bias_a_y;
-  imu_msg_out.linear_acceleration.z = imu_msg.linear_acceleration.z - this->bias_a_z;
-  imu_msg_out.angular_velocity.x = imu_msg.angular_velocity.x - this->bias_w_x;
-  imu_msg_out.angular_velocity.y = imu_msg.angular_velocity.y - this->bias_w_y;
-  imu_msg_out.angular_velocity.z = imu_msg.angular_velocity.z - this->bias_w_z;
-}
 void Esim::setEventThreshold(const float event_threshold)
 {
   this->event_threshold = event_threshold;
@@ -115,7 +61,7 @@ void Esim::setEventThreshold(const float event_threshold)
 
 // last_image : the last time after event was created 32UC1
 // curr_image : the current image 32UC1
-void Esim::simulateESIM(cv::Mat *last_iamge, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events, const sensor_msgs::Imu &imu_msg, sensor_msgs::Image &msg_dep_img, const ros::Time &current_time, const ros::Time &last_time)
+void Esim::simulateESIM(cv::Mat *last_iamge, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events, const geometry_msgs::TwistStamped &imu_msg, const ros::Time &current_time, const ros::Time &last_time)
 {
   cv::Mat last_image_ = this->mem_last_image.clone();
   cv::Mat curr_image_ = curr_image->clone();
@@ -127,34 +73,10 @@ void Esim::simulateESIM(cv::Mat *last_iamge, const cv::Mat *curr_image, std::vec
   curr_image_ += 1e-4;
   last_image_ += 1e-4;
 
-  // get the imu and depth messages
-
-  assert(msg_dep_img.encoding == sensor_msgs::image_encodings::TYPE_32FC1);
-
-  // convert the depth image from senso::Image to float
-  assert(msg_dep_img.data.size() % sizeof(float) == 0);
-  const float *depth_image = reinterpret_cast<float *>(msg_dep_img.data.data());
-
-  if (imu_msg.orientation_covariance[0] < 0)
-  {
-    return;
-  }
   // calculate the timestamp between two consecutive frames
-  sensor_msgs::Imu imu_msg_out;
-  this->imuReoutput(imu_msg, imu_msg_out);
-
-  this->velocity.x += (imu_msg_out.linear_acceleration.x) * f_time_interval;
-  this->velocity.y += (imu_msg_out.linear_acceleration.y) * f_time_interval;
-  this->velocity.z += (imu_msg_out.linear_acceleration.z) * f_time_interval;
-  this->angular_velocity.x = (imu_msg_out.angular_velocity.x);
-  this->angular_velocity.y = (imu_msg_out.angular_velocity.y);
-  this->angular_velocity.z = (imu_msg_out.angular_velocity.z);
-
-  float max_t_v, max_t_l;
-  this->adaptiveSample(&last_image_, &curr_image_, depth_image, f_time_interval, &max_t_v, &max_t_l);
-  float lambda_b = 0.5, lambda_v = 0.5;
+  float max_t_l = this->adaptiveSample(&last_image_, &curr_image_, f_time_interval);
   // the sample interval between two events for events generation is 1 us.
-  float t_sample_interval = std::min(lambda_b * max_t_l, lambda_v * max_t_v);
+  float t_sample_interval = 0.5 * max_t_l;
   // caculate the slope matrix between the two frames
   cv::Mat slope = (curr_image_ - this->mem_last_image) / f_time_interval;
 
@@ -213,41 +135,29 @@ void Esim::processDelta(cv::Mat *last_image, const cv::Mat *curr_image, std::vec
   }
 }
 
-void Esim::egoVelocity(const float Z, const float u, const float v, float *B)
-{
-  // page 12 formula 4 for "ESIM: an Open Event Camera Simulator"
-  *B = std::fabs(-1 / Z * this->velocity.x + u / Z * this->velocity.z + u * v * this->angular_velocity.x - (1 + u * u) * this->angular_velocity.y + v * this->angular_velocity.z) + std::fabs(-1 / Z * this->velocity.y + v / Z * this->velocity.z + (1 + v * v) * this->angular_velocity.x - u * v * this->angular_velocity.y - u * this->angular_velocity.z);
-}
-
-void Esim::lightChange(const float last_pixel, const float curr_pixel, const float f_time_interval, float *delta_pixel)
+float Esim::lightChange(const float last_pixel, const float curr_pixel, const float f_time_interval)
 {
   // l1 and l2 are the logirithmic light intensities of the two frames
-  *delta_pixel = std::fabs((last_pixel - curr_pixel) / f_time_interval);
+  return std::fabs((last_pixel - curr_pixel) / f_time_interval);
 }
 
-void Esim::adaptiveSample(const cv::Mat *last_image, const cv::Mat *curr_image, const float *curr_dep_img_, const float f_time_interval, float *max_t_v, float *max_t_l)
+float Esim::adaptiveSample(const cv::Mat *last_image, const cv::Mat *curr_image, const float f_time_interval)
 {
-  cv::Mat last_image_(last_image->size(), CV_32F), temp_image_(last_image->size(), CV_32F);
+  cv::Mat last_image_(last_image->size(), CV_32F);
   // calculate the velocity and angular velocity for the camera ego movement
-  temp_image_.forEach<float>([&](float &pixel, const int *position) -> void
-                             {
-                                  float Z = curr_dep_img_[(position[0]*last_image->rows+ position[1])];
-                                  this->egoVelocity(Z, position[0], position[1], &pixel); });
   // calculate the light change between the two frames
   last_image_.forEach<float>([&](float &p, const int *position) -> void
                              {
        float l1 = last_image->at<float>(position[0], position[1]);                       
     float l2 = curr_image->at<float>(position[0], position[1]);
-    this->lightChange(l1, l2, f_time_interval, &p); });
-  double temp_max_t_v, temp_max_t_l, min_;
+    p = this->lightChange(l1, l2, f_time_interval); });
+  double temp_max_t_l, min_;
   cv::Point min_loc, max_loc;
   // get the minimum value of the two
-  cv::minMaxLoc(temp_image_, &min_, &temp_max_t_v, &min_loc, &max_loc);
   cv::minMaxLoc(last_image_, &min_, &temp_max_t_l, &min_loc, &max_loc);
 
   // max_t_b is the change of the light intensity between the two frames
-  *max_t_v = static_cast<float>(1 / temp_max_t_v);
-  *max_t_l = static_cast<float>(1 / temp_max_t_l);
+  return static_cast<float>(0.1 / temp_max_t_l);
 }
 
 // void Esim::fillEvents(cv::Mat *mask, int polarity, std::vector<dvs_msgs::Event> *events)

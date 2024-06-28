@@ -37,19 +37,12 @@
 #pragma once
 #include <ros/ros.h>
 #include <vector>
+#include <cmath>
 #include <opencv2/opencv.hpp>
-#include <tf/tf.h>
-
-#include <sensor_msgs/Imu.h>
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/image_encodings.h>
 #include <dvs_msgs/Event.h>
 #include <dvs_msgs/EventArray.h>
-
-#include <gazebo/sensors/DepthCameraSensor.hh>
-#include <gazebo/rendering/DepthCamera.hh>
+#include <geometry_msgs/TwistStamped.h>
 #include <gazebo/common/Plugin.hh>
-
 
 class GAZEBO_VISIBLE Esim
 {
@@ -58,12 +51,10 @@ public:
   static constexpr float MIN_TIME_INTERVAL = 1e-4;
 
 private:
-  geometry_msgs::Vector3 angular_velocity, velocity;
   ros::Time last_time;
   cv::Mat mem_last_image;
   int cols, rows;
   float event_threshold;
-  float bias_a_x, bias_a_y, bias_a_z, bias_w_x, bias_w_y, bias_w_z;
 
 public:
   Esim();
@@ -72,20 +63,14 @@ public:
 
   ~Esim();
 
-  void simulateESIM(cv::Mat *last_iamge, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events, const sensor_msgs::Imu &imu_msg, sensor_msgs::Image &msg_dep_img, const ros::Time &current_time, const ros::Time &last_time);
-
-  void imuCalibration(const std::vector<sensor_msgs::Imu> *imu_msg);
-
-  void imuReoutput(const sensor_msgs::Imu &imu_msg, sensor_msgs::Imu &imu_msg_out);
+  void simulateESIM(cv::Mat *last_iamge, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events, const geometry_msgs::TwistStamped &imu_msg, const ros::Time &current_time, const ros::Time &last_time);
 
   void setEventThreshold(const float event_threshold);
 
 private:
-  void egoVelocity(const float Z, const float u, const float v, float *B);
+  float lightChange(const float last_pixel, const float curr_pixel, const float f_time_interval);
 
-  void lightChange(const float last_pixel, const float curr_pixel, const float f_time_interval, float *delta_pixel);
-
-  void adaptiveSample(const cv::Mat *last_image, const cv::Mat *curr_image, const float *curr_dep_img_, const float f_time_interval, float *min_t_v, float *min_t_b);
+  float adaptiveSample(const cv::Mat *last_image, const cv::Mat *curr_image, const float f_time_interval);
 
   void processDelta(cv::Mat *last_image, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events);
 

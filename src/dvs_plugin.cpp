@@ -51,7 +51,7 @@ namespace gazebo
   ////////////////////////////////////////////////////////////////////////////////
   // Constructor
   DvsPlugin::DvsPlugin()
-      : SensorPlugin(), width(0), height(0), depth(0), has_last_image(false), imu_cali_flag(false)
+      : SensorPlugin(), width(0), height(0), depth(0), has_last_image(false)
   {
     // store the t1 and t2 for two immediate frames.
     this->current_time_ = ros::Time::now();
@@ -128,8 +128,7 @@ namespace gazebo
     // Make sure the parent sensors are active
     this->parentCameraSensor->SetActive(true);
 
-    this->imu_sub_ = this->node_handle_.subscribe("/imu", 1000, &DvsPlugin::imuCallback, this);
-    this->dep_sub_ = this->node_handle_.subscribe("/camera/depth/image_raw", 1000, &DvsPlugin::depthCallback, this);
+    this->vel_sub_ = this->node_handle_.subscribe("/mavros/local_position/velocity_local", 100, &DvsPlugin::MotionCallback, this);
 
     // Initialize the publisher that publishes the IMU data
     this->esim = Esim(this->event_threshold, this->width, this->height);
@@ -185,41 +184,24 @@ float dt = 1.0 / rate;
     */
     // accuquire the img message for calibration
 
-    if (!this->imu_cali_flag)
+    assert(_height == height && _width == width);
+    if (this->has_last_image)
     {
-      vector<sensor_msgs::Imu> imu_msgs;
-      while (imu_msgs.size() < 1000)
-      {
-        if (this->imu_msg_.linear_acceleration_covariance[0] < 0 || this->imu_msg_.angular_velocity_covariance[0] < 0)
-        {
-          continue;
-        }
-        imu_msgs.push_back(this->imu_msg_);
-      }
-      this->esim.imuCalibration(&imu_msgs);
-      this->imu_cali_flag = true;
+      std::vector<dvs_msgs::Event> events;
+      // this->processDelta(&this->last_image, &curr_image,  &events);
+      this->esim.simulateESIM(&this->last_image, &curr_image, &events, this->vel_msgs_, this->current_time_, this->last_time_);
+
+      this->last_time_ = this->current_time_;
+      this->publishEvents(&events);
+    }
+    else if (curr_image.size().area() > 0)
+    {
+      this->last_image = curr_image;
+      this->has_last_image = true;
     }
     else
     {
-      assert(_height == height && _width == width);
-      if (this->has_last_image)
-      {
-        std::vector<dvs_msgs::Event> events;
-        // this->processDelta(&this->last_image, &curr_image,  &events);
-        this->esim.simulateESIM(&this->last_image, &curr_image, &events, this->imu_msg_, this->dep_img_, this->current_time_, this->last_time_);
-
-        this->last_time_ = this->current_time_;
-        this->publishEvents(&events);
-      }
-      else if (curr_image.size().area() > 0)
-      {
-        this->last_image = curr_image;
-        this->has_last_image = true;
-      }
-      else
-      {
-        gzwarn << "Ignoring empty image." << endl;
-      }
+      gzwarn << "Ignoring empty image." << endl;
     }
   }
 
@@ -291,23 +273,10 @@ float dt = 1.0 / rate;
     }
   }
 
-  // Callback function for the IMU subscriber
-  void DvsPlugin::imuCallback(const sensor_msgs::Imu::ConstPtr &msg)
+  // Callback function for the Motion subscriber
+  void DvsPlugin::MotionCallback(const geometry_msgs::TwistStamped::ConstPtr &msg)
   {
-    // Store the latest IMU data
-    this->imu_msg_ = *msg;
-    // Publish the latest IMU data
-    // push the imu messages in the tunnel.
-    // ROS_INFO("IMU data received");
-  }
-
-  void DvsPlugin::depthCallback(const sensor_msgs::ImageConstPtr &msg)
-  {
-    // Get the depth data
-    // this->curr_dep_img_ = this->depthCamera->DepthData();
-    this->dep_img_ = *msg;
-    // Now depthData is a pointer to the depth data array. The size of this array
-    // is equal to the width times the height of the image. Each value in this array
-    // is the depth (in meters) from the camera to the nearest object.
+    // Store the latest Mavros Motion data
+    this->vel_msgs_ = *msg;
   }
 }

@@ -49,17 +49,10 @@
 
 #include <gazebo/common/Plugin.hh>
 #include <gazebo/sensors/CameraSensor.hh>
-#include <gazebo/sensors/DepthCameraSensor.hh>
 #include <gazebo/rendering/Camera.hh>
-#include <gazebo/rendering/DepthCamera.hh>
 
 #include <dvs_msgs/Event.h>
 #include <dvs_msgs/EventArray.h>
-
-#include <sensor_msgs/Image.h>
-#include <sensor_msgs/Imu.h>
-
-#include <cmath>
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
 
@@ -97,24 +90,21 @@ namespace gazebo
     string namespace_;
 
     // for imu and depth data accquisition
-    ros::Subscriber imu_sub_, dep_sub_;
-    // depth image
-    sensor_msgs::Image dep_img_;
+    ros::Subscriber vel_sub_;
     // store a sequence of imu messages for ESIM computing.
-    sensor_msgs::Imu imu_msg_;
+    geometry_msgs::TwistStamped vel_msgs_;
 
   private:
     Mat last_image;
-    bool has_last_image,imu_cali_flag;
+    bool has_last_image;
     float event_threshold;
     Esim esim;
 
   private:
-    void imuCallback(const sensor_msgs::Imu::ConstPtr &msg);
+    void MotionCallback(const geometry_msgs::TwistStamped::ConstPtr &msg);
     void processDelta(Mat *last_image, Mat *curr_image, vector<dvs_msgs::Event> *events);
     void fillEvents(Mat *diff, int polarity, vector<dvs_msgs::Event> *events);
     void publishEvents(vector<dvs_msgs::Event> *events);
-    void depthCallback(const sensor_msgs::ImageConstPtr &msg);
   };
 }
 #endif

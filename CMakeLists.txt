@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 
-set(CMAKE_PROJECT_VERSION 1.0.0)
+set(CMAKE_PROJECT_VERSION 1.1.0)
 project(gazebo_dvs_plugin)
 
 find_package(catkin REQUIRED COMPONENTS
