@@ -33,19 +33,12 @@
  *
  */
 
-#ifndef DVS_PLUGIN_HPP
-#define DVS_PLUGIN_HPP
-
-#ifdef _WIN32
-// Ensure that Winsock2.h is included before Windows.h, which can get
-// pulled in by anybody (e.g., Boost).
-#include <Winsock2.h>
-#endif
-
+#pragma once
 #include <string>
 
 #include <ros/ros.h>
 #include <ros/console.h>
+#include <rosgraph_msgs/Clock.h>
 
 #include <gazebo/common/Plugin.hh>
 #include <gazebo/sensors/CameraSensor.hh>
@@ -56,9 +49,10 @@
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
 
-#include <gazebo_dvs_plugin/esim.hpp>
-using namespace std;
-using namespace cv;
+#include <simulator/simulator.hpp>
+#include <simulator/esim.hpp>
+#include <simulator/iebcs.hpp>
+#include <simulator/plain.hpp>
 
 namespace gazebo
 {
@@ -69,42 +63,32 @@ namespace gazebo
     ~DvsPlugin();
     void Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf);
 
-  protected:
+  private:
     virtual void mainCallback(const unsigned char *_image,
                               unsigned int _width, unsigned int _height,
-                              unsigned int _depth, const string &_format);
+                              const std::string &_format);
+    // void ClockCallback(const rosgraph_msgs::Clock::ConstPtr &msg);
+    void publishEvents(std::vector<dvs_msgs::Event> *events);
 
-  protected:
-    unsigned int width, height, depth;
-    string format;
+  private:
+    unsigned int width_, height_;
+    std::string format_;
 
     sensors::CameraSensorPtr parentCameraSensor;
-    rendering::CameraPtr camera;
+    rendering::CameraPtr camera_;
     // interpolate start time and end time between frames
-    ros::Time last_time_, current_time_;
+    ros::Time last_time_, current_time_, clk_;
 
     event::ConnectionPtr newFrameConnection;
 
     ros::NodeHandle node_handle_;
     ros::Publisher event_pub_;
-    string namespace_;
-
-    // for imu and depth data accquisition
-    ros::Subscriber vel_sub_;
-    // store a sequence of imu messages for ESIM computing.
-    geometry_msgs::TwistStamped vel_msgs_;
+    // ros::Subscriber clock_sub_;
+    std::string namespace_;
 
   private:
-    Mat last_image;
-    bool has_last_image;
-    float event_threshold;
-    Esim esim;
-
-  private:
-    void MotionCallback(const geometry_msgs::TwistStamped::ConstPtr &msg);
-    void processDelta(Mat *last_image, Mat *curr_image, vector<dvs_msgs::Event> *events);
-    void fillEvents(Mat *diff, int polarity, vector<dvs_msgs::Event> *events);
-    void publishEvents(vector<dvs_msgs::Event> *events);
+    cv::Mat last_image_;
+    bool has_last_image_;
+    EventSimulator *simu_;
   };
 }
-#endif

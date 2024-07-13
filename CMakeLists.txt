@@ -7,7 +7,6 @@ find_package(catkin REQUIRED COMPONENTS
   gazebo_ros
   gazebo_plugins
   dvs_msgs
-  roscpp
   cv_bridge
   roscpp
   rospy
@@ -23,7 +22,6 @@ catkin_package(
   CATKIN_DEPENDS
     gazebo_ros
     gazebo_plugins
-    roscpp
     dvs_msgs
     cv_bridge
     roscpp
@@ -50,8 +48,10 @@ include_directories(
 )
 
 add_library(${PROJECT_NAME}
-    src/dvs_plugin.cpp
-    src/esim.cpp
+    src/gazebo_dvs_plugin/dvs_plugin.cpp
+    src/simulator/esim.cpp
+    src/simulator/iebcs.cpp
+    src/simulator/plain.cpp
 )
 add_dependencies(${PROJECT_NAME}
     ${catkin_EXPORTED_TARGETS}

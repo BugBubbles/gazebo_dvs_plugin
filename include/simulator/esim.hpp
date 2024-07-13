@@ -36,43 +36,38 @@
 
 #pragma once
 #include <ros/ros.h>
+#include <ros/console.h>
+#include <random>
 #include <vector>
 #include <cmath>
 #include <opencv2/opencv.hpp>
 #include <dvs_msgs/Event.h>
 #include <dvs_msgs/EventArray.h>
-#include <geometry_msgs/TwistStamped.h>
 #include <gazebo/common/Plugin.hh>
 
-class GAZEBO_VISIBLE Esim
+#include <simulator/simulator.hpp>
+class GAZEBO_VISIBLE Esim : public EventSimulator
 {
-public:
-  // the minimum time interval between two events for events generation
-  static constexpr float MIN_TIME_INTERVAL = 1e-4;
+  // public:
+  //   // the minimum time interval between two events for events generation
+  //   static constexpr double_t DYNAMIC_RANGE = 50;
 
 private:
-  ros::Time last_time;
-  cv::Mat mem_last_image;
-  int cols, rows;
-  float event_threshold;
+  ros::Time last_time_;
+  cv::Mat mem_last_image_;
+  // double_t th_pos_, th_neg_, th_noise_;
+  std::default_random_engine generator_cur_th_;
+  std::normal_distribution<double_t> distribution_cur_th_;
 
 public:
   Esim();
+  Esim(int width, int height, sdf::ElementPtr _sdf);
+  virtual ~Esim();
 
-  Esim(float event_threshold, int width, int height);
-
-  ~Esim();
-
-  void simulateESIM(cv::Mat *last_iamge, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events, const geometry_msgs::TwistStamped &imu_msg, const ros::Time &current_time, const ros::Time &last_time);
-
-  void setEventThreshold(const float event_threshold);
+  virtual void simulateMain(const cv::Mat *last_iamge, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events, const ros::Time &current_time, const ros::Time &last_time);
 
 private:
-  float lightChange(const float last_pixel, const float curr_pixel, const float f_time_interval);
-
-  float adaptiveSample(const cv::Mat *last_image, const cv::Mat *curr_image, const float f_time_interval);
-
-  void processDelta(cv::Mat *last_image, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events);
-
-  void fillEvents(const cv::Mat *mask, const int polarity, std::vector<dvs_msgs::Event> *events);
+  double_t adaptiveSample(const cv::Mat *last_image, const cv::Mat *curr_image);
+  void processDelta(cv::Mat *last_image, const cv::Mat *curr_image, ros::Time &ts, std::vector<dvs_msgs::Event> *events);
+  void fillEvents(const cv::Mat *mask, int polarity, ros::Time &ts, std::vector<dvs_msgs::Event> *events);
 };

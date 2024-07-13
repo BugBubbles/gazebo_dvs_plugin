@@ -40,9 +40,6 @@
 
 #include <gazebo_dvs_plugin/dvs_plugin.hpp>
 
-using namespace std;
-using namespace cv;
-
 namespace gazebo
 {
   // Register this plugin with the simulator
@@ -51,11 +48,9 @@ namespace gazebo
   ////////////////////////////////////////////////////////////////////////////////
   // Constructor
   DvsPlugin::DvsPlugin()
-      : SensorPlugin(), width(0), height(0), depth(0), has_last_image(false)
   {
     // store the t1 and t2 for two immediate frames.
-    this->current_time_ = ros::Time::now();
-    this->last_time_ = ros::Time::now();
+    has_last_image_ = false;
   }
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -63,97 +58,118 @@ namespace gazebo
   DvsPlugin::~DvsPlugin()
   {
     this->parentCameraSensor.reset();
-    this->camera.reset();
+    this->camera_.reset();
+    delete[] simu_;
   }
 
   // load funtion provide the api for `roslaunch` to execute. It just need a subscriber to accquire the exists sensors' data.
   void DvsPlugin::Load(sensors::SensorPtr _sensor, sdf::ElementPtr _sdf)
   {
     if (!_sensor)
-      gzerr << "Invalid sensor pointer." << endl;
-
-#if GAZEBO_MAJOR_VERSION >= 7
-    this->parentCameraSensor = std::dynamic_pointer_cast<gazebo::sensors::CameraSensor>(_sensor);
-    this->camera = this->parentCameraSensor->Camera();
-#else
-    this->parentCameraSensor = boost::dynamic_pointer_cast<sensors::CameraSensor>(_sensor);
-    this->camera = this->parentCameraSensor->GetCamera();
-#endif
-
-    if (!this->parentCameraSensor)
     {
-      gzerr << "DvsPlugin not attached to a camera sensor." << endl;
+      ROS_ERROR("Invalid sensor pointer.");
       return;
     }
 
 #if GAZEBO_MAJOR_VERSION >= 7
-    this->width = this->camera->ImageWidth();
-    this->height = this->camera->ImageHeight();
-    this->depth = this->camera->ImageDepth();
-    this->format = this->camera->ImageFormat();
+    this->parentCameraSensor = std::dynamic_pointer_cast<gazebo::sensors::CameraSensor>(_sensor);
+    this->camera_ = this->parentCameraSensor->Camera();
 #else
-    this->width = this->camera->GetImageWidth();
-    this->height = this->camera->GetImageHeight();
-    this->depth = this->camera->GetImageDepth();
-    this->format = this->camera->GetImageFormat();
+    this->parentCameraSensor = boost::dynamic_pointer_cast<sensors::CameraSensor>(_sensor);
+    this->camera_ = this->parentCameraSensor->GetCamera();
+#endif
+
+    if (!this->parentCameraSensor)
+    {
+      ROS_ERROR("DvsPlugin not attached to a camera sensor.");
+      return;
+    }
+
+#if GAZEBO_MAJOR_VERSION >= 7
+    this->width_ = this->camera_->ImageWidth();
+    this->height_ = this->camera_->ImageHeight();
+    this->format_ = this->camera_->ImageFormat();
+#else
+    this->width_ = this->camera_->GetImageWidth();
+    this->height_ = this->camera_->GetImageHeight();
+    this->format_ = this->camera_->GetImageFormat();
 #endif
 
     if (_sdf->HasElement("robotNamespace"))
       namespace_ = _sdf->GetElement("robotNamespace")->Get<std::string>();
     else
-      gzwarn << "[gazebo_ros_dvs_camera] Please specify a robotNamespace." << endl;
+      ROS_WARN("[DVS_plugin] Please specify a robotNamespace.");
 
-    string sensorName = "";
+    std::string sensorName = "";
     if (_sdf->HasElement("sensorName"))
       sensorName = _sdf->GetElement("sensorName")->Get<std::string>() + "/";
     else
-      gzwarn << "[gazebo_ros_dvs_camera] Please specify a sensorName." << endl;
+      ROS_WARN("[DVS_plugin] Please specify a sensorName.");
 
-    string eventName = "events";
+    std::string eventName = "events";
     if (_sdf->HasElement("eventsTopicName"))
       eventName = _sdf->GetElement("eventsTopicName")->Get<std::string>();
 
-    const string eventTopic = sensorName + eventName;
+    const std::string eventTopic = sensorName + eventName;
 
-    if (_sdf->HasElement("eventThreshold"))
-      this->event_threshold = _sdf->GetElement("eventThreshold")->Get<float>();
+    if (_sdf->HasElement("model"))
+    {
+      std::string model = _sdf->GetElement("model")->Get<std::string>();
+      if (model == "IEBCS")
+      {
+        simu_ = new IEBCSim(width_, height_, _sdf);
+      }
+      else if (model == "ESIM")
+      {
+        simu_ = new Esim(width_, height_, _sdf);
+      }
+      else if (model == "PLAIN")
+      {
+        simu_ = new Plain(width_, height_, _sdf);
+      }
+      else
+      {
+        ROS_ERROR("[DVS_plugin] Invalid event simulator model!");
+        return;
+      }
+    }
     else
-      gzwarn << "[gazebo_ros_dvs_camera] Please specify a DVS threshold." << endl;
+    {
+      ROS_WARN("[DVS_plugin] No model was explicit, default is plain Event Camera.");
+      simu_ = new Plain(width_, height_, _sdf);
+    }
 
-    this->event_pub_ = this->node_handle_.advertise<dvs_msgs::EventArray>(eventTopic, 1000, true);
+    this->event_pub_ = this->node_handle_.advertise<dvs_msgs::EventArray>(eventTopic, 10000, true);
 
-    this->newFrameConnection = this->camera->ConnectNewImageFrame(
-        boost::bind(&DvsPlugin::mainCallback, this, _1, this->width, this->height, this->depth, this->format));
+    this->newFrameConnection = this->camera_->ConnectNewImageFrame(
+        boost::bind(&DvsPlugin::mainCallback, this, _1, this->width_, this->height_, this->format_));
 
     // Make sure the parent sensors are active
     this->parentCameraSensor->SetActive(true);
 
-    this->vel_sub_ = this->node_handle_.subscribe("/mavros/local_position/velocity_local", 100, &DvsPlugin::MotionCallback, this);
-
-    // Initialize the publisher that publishes the IMU data
-    this->esim = Esim(this->event_threshold, this->width, this->height);
+    // this->clock_sub_ = this->node_handle_.subscribe("/clock", 100, &DvsPlugin::ClockCallback, this);
   }
 
   ////////////////////////////////////////////////////////////////////////////////
   // Update the controller
   // actually this funtion is the main part of dvs_plugin
   void DvsPlugin::mainCallback(const unsigned char *_image,
-                               unsigned int _width, unsigned int _height, unsigned int _depth,
+                               unsigned int _width, unsigned int _height,
                                const std::string &_format)
   {
 #if GAZEBO_MAJOR_VERSION >= 7
-    _image = this->camera->ImageData(0);
+    _image = this->camera_->ImageData(0);
 #else
-    _image = this->camera->GetImageData(0);
+    _image = this->camera_->GetImageData(0);
 #endif
-    // add DepthCameraSensor to get the depth image
-    this->current_time_ = ros::Time::now();
+    // add DepthCameraSensor to get the depth_ image
+    current_time_ = ros::Time::now();
 
     /*
 #if GAZEBO_MAJOR_VERSION >= 7
-float rate = this->camera->RenderRate();
+float rate = this->camera_->RenderRate();
 #else
-float rate = this->camera->GetRenderRate();
+float rate = this->camera_->GetRenderRate();
 #endif
 if (!isfinite(rate))
 rate =  30.0;
@@ -169,7 +185,7 @@ float dt = 1.0 / rate;
     cvtColor(input_image, curr_image_rgb, CV_RGB2BGR);
     cvtColor(curr_image_rgb, input_image, CV_BGR2GRAY);
 
-    cv::Mat curr_image = input_image;
+    input_image.convertTo(input_image, CV_64F);
 
     /* TODO any encoding configuration should be supported
         try {
@@ -184,74 +200,25 @@ float dt = 1.0 / rate;
     */
     // accuquire the img message for calibration
 
-    assert(_height == height && _width == width);
-    if (this->has_last_image)
+    assert(_height == height_ && _width == width_);
+    if (has_last_image_)
     {
       std::vector<dvs_msgs::Event> events;
-      // this->processDelta(&this->last_image, &curr_image,  &events);
-      this->esim.simulateESIM(&this->last_image, &curr_image, &events, this->vel_msgs_, this->current_time_, this->last_time_);
-
-      this->last_time_ = this->current_time_;
+      // this->processDelta(&last_image_, &curr_image, &events);
+      simu_->simulateMain(&last_image_, &input_image, &events, current_time_, last_time_);
+      last_image_ = input_image;
+      last_time_ = current_time_;
       this->publishEvents(&events);
     }
-    else if (curr_image.size().area() > 0)
+    else if (input_image.size().area() > 0)
     {
-      this->last_image = curr_image;
-      this->has_last_image = true;
+      last_image_ = input_image;
+      has_last_image_ = true;
+      last_time_ = current_time_;
     }
     else
     {
-      gzwarn << "Ignoring empty image." << endl;
-    }
-  }
-
-  void DvsPlugin::processDelta(cv::Mat *last_image, cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events)
-  {
-    if (curr_image->size() == last_image->size())
-    {
-      cv::Mat pos_diff = *curr_image - *last_image;
-      cv::Mat neg_diff = *last_image - *curr_image;
-
-      cv::Mat pos_mask;
-      cv::Mat neg_mask;
-
-      cv::threshold(pos_diff, pos_mask, event_threshold, 255, cv::THRESH_BINARY);
-      cv::threshold(neg_diff, neg_mask, event_threshold, 255, cv::THRESH_BINARY);
-
-      *last_image += pos_mask & pos_diff;
-      *last_image -= neg_mask & neg_diff;
-
-      // std::vector<dvs_msgs::Event> events;
-
-      this->fillEvents(&pos_mask, 0, events);
-      this->fillEvents(&neg_mask, 1, events);
-
-      // this->publishEvents(&events);
-    }
-    else
-    {
-      gzwarn << "Unexpected change in image size (" << last_image->size() << " -> " << curr_image->size() << "). Publishing no events for this frame change." << endl;
-    }
-  }
-
-  void DvsPlugin::fillEvents(cv::Mat *mask, int polarity, std::vector<dvs_msgs::Event> *events)
-  {
-    // findNonZero fails when there are no zeros
-    // TODO is there a better workaround then iterating the binary image twice?
-    if (cv::countNonZero(*mask) != 0)
-    {
-      std::vector<cv::Point> locs;
-      cv::findNonZero(*mask, locs);
-
-      for (int i = 0; i < locs.size(); i++)
-      {
-        dvs_msgs::Event event;
-        event.x = locs[i].x;
-        event.y = locs[i].y;
-        event.ts = ros::Time::now();
-        event.polarity = polarity;
-        events->push_back(event);
-      }
+      ROS_WARN("Ignoring empty image.");
     }
   }
 
@@ -262,10 +229,9 @@ float dt = 1.0 / rate;
       dvs_msgs::EventArray msg;
       msg.events.clear();
       msg.events.insert(msg.events.end(), events->begin(), events->end());
-      msg.width = width;
-      msg.height = height;
+      msg.width = width_;
+      msg.height = height_;
 
-      // TODO what frame_id is adequate?
       msg.header.frame_id = namespace_;
       msg.header.stamp = ros::Time::now();
 
@@ -273,10 +239,9 @@ float dt = 1.0 / rate;
     }
   }
 
-  // Callback function for the Motion subscriber
-  void DvsPlugin::MotionCallback(const geometry_msgs::TwistStamped::ConstPtr &msg)
-  {
-    // Store the latest Mavros Motion data
-    this->vel_msgs_ = *msg;
-  }
+  // Callback function for the Clock subscriber
+  // void DvsPlugin::ClockCallback(const rosgraph_msgs::Clock::ConstPtr &clk)
+  // {
+  //   clk_ = clk->clock;
+  // }
 }
