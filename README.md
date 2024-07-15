@@ -124,7 +124,7 @@ Still, this implementation yields a higher event frequency than similar Python-b
 
 # Acknowledgement
 
-We thank paper [Towards a framework for end-to-end control of a simulated vehicle with spiking neural networks](http://ieeexplore.ieee.org/document/7862386/) and [Event camera simulator improvements via characterized parameters](https://github.com/neuromorphicsystems/IEBCS) for their open source, please cite their papers if you use this code.
+We thank paper [Towards a framework for end-to-end control of a simulated vehicle with spiking neural networks](http://ieeexplore.ieee.org/document/7862386/) and [Event camera simulator improvements via characterized parameters](https://github.com/neuromorphicsystems/IEBCS) for their open source, please cite their papers if you use this code. We also thank `ESIM: an Open Event Camera Simulator` for their theoritical support, please cite there paper if you use this code.
 
 ```
 @INPROCEEDINGS{7862386,
@@ -163,18 +163,4 @@ month={Dec},}
   langid = {english},
 }
 
-```
-We also thank `ESIM: an Open Event Camera Simulator` for their theoritical support, please cite there paper if you use this code.
-
-```
-@inproceedings{rebecqESIMOpenEvent2018,
-  title = {{{ESIM}}: An {{Open Event Camera Simulator}}},
-  booktitle = {Conference on Robot Learning},
-  author = {Rebecq, Henri and Gehrig, Daniel and Scaramuzza, Davide},
-  date = {2018},
-  pages = {969--982},
-  publisher = {PMLR},
-  location = {Zurich, Switzerland},
-  eventtitle = {2nd {{Conference}} on {{Robot Learning}} ({{CoRL}} 2018)},
-}
 ```
