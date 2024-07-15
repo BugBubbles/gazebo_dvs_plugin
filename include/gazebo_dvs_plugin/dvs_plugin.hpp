@@ -43,6 +43,7 @@
 #include <gazebo/common/Plugin.hh>
 #include <gazebo/sensors/CameraSensor.hh>
 #include <gazebo/rendering/Camera.hh>
+#include <sensor_msgs/CameraInfo.h>
 
 #include <dvs_msgs/Event.h>
 #include <dvs_msgs/EventArray.h>
@@ -69,6 +70,7 @@ namespace gazebo
                               const std::string &_format);
     // void ClockCallback(const rosgraph_msgs::Clock::ConstPtr &msg);
     void publishEvents(std::vector<dvs_msgs::Event> *events);
+    void publishCameraInfo(const std::string &camera_info);
 
   private:
     unsigned int width_, height_;
@@ -82,7 +84,7 @@ namespace gazebo
     event::ConnectionPtr newFrameConnection;
 
     ros::NodeHandle node_handle_;
-    ros::Publisher event_pub_;
+    ros::Publisher event_pub_, info_pub_;
     // ros::Subscriber clock_sub_;
     std::string namespace_;
 

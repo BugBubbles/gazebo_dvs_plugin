@@ -58,7 +58,6 @@ namespace gazebo
   DvsPlugin::~DvsPlugin()
   {
     this->parentCameraSensor.reset();
-    this->camera_.reset();
     delete[] simu_;
   }
 
@@ -106,11 +105,10 @@ namespace gazebo
     else
       ROS_WARN("[DVS_plugin] Please specify a sensorName.");
 
-    std::string eventName = "events";
-    if (_sdf->HasElement("eventsTopicName"))
-      eventName = _sdf->GetElement("eventsTopicName")->Get<std::string>();
+    std::string eventTopic = sensorName + "events";
+    std::string CameraInfo = sensorName + "camera_info";
 
-    const std::string eventTopic = sensorName + eventName;
+    this->publishCameraInfo(CameraInfo);
 
     if (_sdf->HasElement("model"))
     {
@@ -238,7 +236,21 @@ float dt = 1.0 / rate;
       event_pub_.publish(msg);
     }
   }
+  void DvsPlugin::publishCameraInfo(const std::string &camera_info)
+  { // publish the configuration of event camera
+    sensor_msgs::CameraInfo info_msgs;
 
+    info_msgs.height = parentCameraSensor->Camera()->ImageHeight();
+    info_msgs.width = parentCameraSensor->Camera()->ImageWidth();
+    const ignition::math::Matrix4<double_t> P = parentCameraSensor->Camera()->ProjectionMatrix();
+    for (int i = 0; i < 12; i++)
+    {
+      info_msgs.P[i] = P(i / 4, i % 4);
+    }
+    this->info_pub_ = this->node_handle_.advertise<sensor_msgs::CameraInfo>(camera_info, 10, true);
+    this->info_pub_.publish(info_msgs);
+    this->info_pub_.shutdown();
+  }
   // Callback function for the Clock subscriber
   // void DvsPlugin::ClockCallback(const rosgraph_msgs::Clock::ConstPtr &clk)
   // {
