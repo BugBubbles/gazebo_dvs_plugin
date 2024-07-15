@@ -1,6 +1,6 @@
 # DVS Gazebo Plugin
 
-This package provides a DVS simulation implemented as Gazebo plugin.
+This package provides a DVS simulation implemented as Gazebo plugin, forked from https://github.com/HBPNeurorobotics/gazebo_dvs_plugin.
 
 ## Install
 
@@ -73,13 +73,20 @@ The following SDF snippet shows an example usage:
         <update_rate>400</update_rate>
         <visualize>1</visualize>
         <plugin name='camera_controller' filename='libgazebo_dvs_plugin.so'>
-            <sensorName>dvs</sensorName>
             <robotNamespace>/</robotNamespace>
-            <eventThreshold>20</eventThreshold>
+            <sensorName>dvs</sensorName>
             <eventsTopicName>events</eventsTopicName>
-            <imageTopicName>image_raw</imageTopicName>
-            <!-- <imuTopicName>imu</imuTopicName> -->
-            <cameraInfoTopicName>camera_info</cameraInfoTopicName>
+            <model>IEBCS</model>  <!-- PLAIN, ESIM, IEBCS -->
+            <posThreshold>0.5</posThreshold>
+            <negThreshold>0.5</negThreshold>
+            <noiseThreshold>0.035</noiseThreshold>
+            <!-- Valid for IEBCS event camera -->
+            <latency>100</latency>
+            <jitter>10</jitter>
+            <refractory>100</refractory>
+            <tau>300</tau>
+            <luminance>0.1</luminance>  <!-- 0.1, 161, 3k -->
+            <noiseCache>/home/docker/.gazebo/models/event_camera/materials/noise</noiseCache>
         </plugin>
     </sensor>
     <self_collide>0</self_collide>
@@ -88,20 +95,36 @@ The following SDF snippet shows an example usage:
   </model>
 </sdf>
 ```
-
-The parameters `robotNamespace`, `cameraName` and `eventsTopicName` (default: "events") result in `"$robotNamespace/$cameraName/$eventsTopicName"`
-as the identifier of the provided events topic.
-In this case, events will be accessible from `"/AADC_AudiTT/camera_front/events"`.
-
-The parameter `eventThreshold` specifies the pixel-wise threshold which has to be exceeded for a event to be emitted for this pixel.
+## Parameter Explaination
+| Parameter | Description |
+| :---: | --- |
+| `robotNamespace` | The root space of ROS, if you don't know how to use it, keep it as default `/`. |
+| `sensorName` | The name of the sensor, it will be used as the topic name of the sensor. We suggest to set it as `dvs` |
+| `eventsTopicName` | The name of the topic that the sensor will publish events to. We suggest to set it as `events` |
+| `model` | The model of the event camera, it can be `PLAIN`, `ESIM`, `IEBCS`, represented for plainly difference between two intermediate frames, [ESIM](http://ieeexplore.ieee.org/document/7862386/) based and [IEBCS](https://github.com/neuromorphicsystems/IEBCS) based. |
+| `posThreshold` | The positive threshold of the event camera, it is used to determine the positive event. |
+| `negThreshold` | The negative threshold of the event camera, it is used to determine the negative event. |
+| `noiseThreshold` | The noise threshold of the event camera, it is used to determine the noise event. We suggest it should no more than 0.1 |
+| `latency` | The latency of arbieter with its unit being us. **Only valid for IEBCS model**. |
+| `jitter` | The jitter of clock with its unit being us. **Only valid for IEBCS model**. |
+| `refractory` | The refractory period of the event camera with its unit being us. **Only valid for IEBCS model**. |
+| `tau` | The time constant of 2nd damping process with its unit being us. **Only valid for IEBCS model**. |
+| `luminance` | The luminance of the IEBCS based noise parameter, it can be `0.1`, `161`, `3k`. **Only valid for IEBCS model**. |
+| `noiseCache` | The path of the noise cache file, it is used to store the noise of the event camera. **Only valid for IEBCS model**. |
 
 The sensor parameter `update_rate` has only limited effect in Gazebo.
 The real rate is determined by the rendering pipeline and can be way lower than the specified rate.
 Still, this implementation yields a higher event frequency than similar Python-based implementations as a standalone node.
+## Recommanded Parameters List
+| `model` | `posThreshold` | `negThreshold` | `noiseThreshold` | `latency` | `jitter` | `refractory` | `tau` | `luminance` | `noiseCache` |
+|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `PLAIN` | 0.3 | 0.6 | - | - | - | - | - | - | - |
+| `ESIM` | 0.3 | 0.6 | 0.035 | - | - | - | - | - | - |
+| `IEBCS` | 0.5 | 0.5 | 0.035 | 100 | 10 | 100 | 300 | 0.1 | `/path/to/your/materials/noise` |
 
 # Acknowledgement
 
-We thank paper [Towards a framework for end-to-end control of a simulated vehicle with spiking neural networks](http://ieeexplore.ieee.org/document/7862386/) for their open source, please cite there paper if you use this code.
+We thank paper [Towards a framework for end-to-end control of a simulated vehicle with spiking neural networks](http://ieeexplore.ieee.org/document/7862386/) and [Event camera simulator improvements via characterized parameters](https://github.com/neuromorphicsystems/IEBCS) for their open source, please cite their papers if you use this code.
 
 ```
 @INPROCEEDINGS{7862386,
@@ -113,4 +136,20 @@ pages={127-134},
 keywords={automobiles;cameras;complex networks;feedforward neural nets;learning (artificial intelligence);mobile robots;DVS;camera images;complex networks;deep learning architectures;end-to-end simulated vehicle control;hand-crafted feature detectors;neural self-driving vehicle applications;neurorobotics applications;rate-based neural networks;silicon retina;spiking neural networks;steering wheel decoder;vehicle end-to-end for lane following behavior;Biological neural networks;Brain modeling;Cameras;Robot sensing systems;Voltage control},
 doi={10.1109/SIMPAR.2016.7862386},
 month={Dec},}
+@article{joubertEventCameraSimulator2021,
+  title = {Event Camera Simulator Improvements via Characterized Parameters},
+  author = {Joubert, Damien and Marcireau, Alexandre and Ralph, Nic and Jolley, Andrew and family=Schaik, given=André, prefix=van, useprefix=true and Cohen, Gregory},
+  date = {2021-07-27},
+  journaltitle = {Frontiers in Neuroscience},
+  shortjournal = {Front. Neurosci.},
+  volume = {15},
+  pages = {702765},
+  issn = {1662-453X},
+  doi = {10/grr5d8},
+  url = {https://www.frontiersin.org/articles/10.3389/fnins.2021.702765/full},
+  urldate = {2023-02-13},
+  langid = {english},
+  annotation = {16 citations (Crossref/title) [2024-07-09]},
+}
+
 ```
