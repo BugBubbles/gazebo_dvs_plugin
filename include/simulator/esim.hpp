@@ -30,67 +30,44 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
-#pragma once
-#include <string>
+/* ESIM is proposed by Henri Rebecq et al, in paper "ESIM: an Open Event Camera Simulator"*/
 
+#pragma once
 #include <ros/ros.h>
 #include <ros/console.h>
-#include <rosgraph_msgs/Clock.h>
-
-#include <gazebo/common/Plugin.hh>
-#include <gazebo/sensors/CameraSensor.hh>
-#include <gazebo/rendering/Camera.hh>
-#include <sensor_msgs/CameraInfo.h>
-
+#include <random>
+#include <vector>
+#include <cmath>
+#include <opencv2/opencv.hpp>
 #include <dvs_msgs/Event.h>
 #include <dvs_msgs/EventArray.h>
-#include <opencv2/opencv.hpp>
-#include <cv_bridge/cv_bridge.h>
+#include <gazebo/common/Plugin.hh>
 
 #include <simulator/simulator.hpp>
-#include <simulator/esim.hpp>
-#include <simulator/iebcs.hpp>
-#include <simulator/plain.hpp>
-
-namespace gazebo
+class GAZEBO_VISIBLE Esim : public EventSimulator
 {
-  class GAZEBO_VISIBLE DvsPlugin : public SensorPlugin
-  {
-  public:
-    DvsPlugin();
-    ~DvsPlugin();
-    void Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf);
+  // public:
+  //   // the minimum time interval between two events for events generation
+  //   static constexpr double_t DYNAMIC_RANGE = 50;
 
-  private:
-    virtual void mainCallback(const unsigned char *_image,
-                              unsigned int _width, unsigned int _height,
-                              const std::string &_format);
-    // void ClockCallback(const rosgraph_msgs::Clock::ConstPtr &msg);
-    void publishEvents(std::vector<dvs_msgs::Event> *events);
-    void publishCameraInfo(const std::string &camera_info);
+private:
+  ros::Time last_time_;
+  cv::Mat mem_last_image_;
+  // double_t th_pos_, th_neg_, th_noise_;
+  std::default_random_engine generator_cur_th_;
+  std::normal_distribution<double_t> distribution_cur_th_;
 
-  private:
-    unsigned int width_, height_;
-    std::string format_;
+public:
+  Esim();
+  Esim(int width, int height, sdf::ElementPtr _sdf);
+  virtual ~Esim();
 
-    sensors::CameraSensorPtr parentCameraSensor;
-    rendering::CameraPtr camera_;
-    // interpolate start time and end time between frames
-    ros::Time last_time_, current_time_, clk_;
+  virtual void simulateMain(const cv::Mat *last_iamge, const cv::Mat *curr_image, std::vector<dvs_msgs::Event> *events, const ros::Time &current_time, const ros::Time &last_time);
 
-    event::ConnectionPtr newFrameConnection;
-
-    ros::NodeHandle node_handle_;
-    ros::Publisher event_pub_, info_pub_;
-    // ros::Subscriber clock_sub_;
-    std::string namespace_;
-
-  private:
-    cv::Mat last_image_;
-    bool has_last_image_;
-    EventSimulator *simu_;
-  };
-}
+private:
+  double_t adaptiveSample(const cv::Mat *last_image, const cv::Mat *curr_image);
+  void processDelta(cv::Mat *last_image, const cv::Mat *curr_image, ros::Time &ts, std::vector<dvs_msgs::Event> *events);
+  void fillEvents(const cv::Mat *mask, int polarity, ros::Time &ts, std::vector<dvs_msgs::Event> *events);
+};
