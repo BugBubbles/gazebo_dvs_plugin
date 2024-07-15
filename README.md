@@ -101,16 +101,16 @@ The following SDF snippet shows an example usage:
 | `robotNamespace` | The root space of ROS, if you don't know how to use it, keep it as default `/`. |
 | `sensorName` | The name of the sensor, it will be used as the topic name of the sensor. We suggest to set it as `dvs` |
 | `eventsTopicName` | The name of the topic that the sensor will publish events to. We suggest to set it as `events` |
-| `model` | The model of the event camera, it can be `PLAIN`, `ESIM`, `IEBCS`, represented for plainly difference between two intermediate frames, [ESIM](http://ieeexplore.ieee.org/document/7862386/) based and [IEBCS](https://github.com/neuromorphicsystems/IEBCS) based. |
+| `model` | The model of the event camera, it can be `PLAIN`, `ESIM`, `IEBCS`, represented for plainly difference between two intermediate frames, [ESIM](https://github.com/uzh-rpg/rpg_esim) based and [IEBCS](https://github.com/neuromorphicsystems/IEBCS) based. |
 | `posThreshold` | The positive threshold of the event camera, it is used to determine the positive event. |
 | `negThreshold` | The negative threshold of the event camera, it is used to determine the negative event. |
 | `noiseThreshold` | The noise threshold of the event camera, it is used to determine the noise event. We suggest it should no more than 0.1 |
-| `latency` | The latency of arbieter with its unit being us. **Only valid for IEBCS model**. |
-| `jitter` | The jitter of clock with its unit being us. **Only valid for IEBCS model**. |
-| `refractory` | The refractory period of the event camera with its unit being us. **Only valid for IEBCS model**. |
-| `tau` | The time constant of 2nd damping process with its unit being us. **Only valid for IEBCS model**. |
-| `luminance` | The luminance of the IEBCS based noise parameter, it can be `0.1`, `161`, `3k`. **Only valid for IEBCS model**. |
-| `noiseCache` | The path of the noise cache file, it is used to store the noise of the event camera. **Only valid for IEBCS model**. |
+| `latency` | The latency of arbieter with its unit being us. **Only valid in IEBCS model**. |
+| `jitter` | The jitter of clock with its unit being us. **Only valid in IEBCS model**. |
+| `refractory` | The refractory period of the event camera with its unit being us. **Only valid in IEBCS model**. |
+| `tau` | The time constant of 2nd damping process with its unit being us. **Only valid in IEBCS model**. |
+| `luminance` | The luminance of the IEBCS based noise parameter, it can be `0.1`, `161`, `3k`. **Only valid in IEBCS model**. |
+| `noiseCache` | The path of the noise cache file, it is used to store the noise of the event camera. **Only valid in IEBCS model**. |
 
 The sensor parameter `update_rate` has only limited effect in Gazebo.
 The real rate is determined by the rendering pipeline and can be way lower than the specified rate.
@@ -133,9 +133,21 @@ booktitle={2016 IEEE International Conference on Simulation, Modeling, and Progr
 title={Towards a framework for end-to-end control of a simulated vehicle with spiking neural networks},
 year={2016},
 pages={127-134},
-keywords={automobiles;cameras;complex networks;feedforward neural nets;learning (artificial intelligence);mobile robots;DVS;camera images;complex networks;deep learning architectures;end-to-end simulated vehicle control;hand-crafted feature detectors;neural self-driving vehicle applications;neurorobotics applications;rate-based neural networks;silicon retina;spiking neural networks;steering wheel decoder;vehicle end-to-end for lane following behavior;Biological neural networks;Brain modeling;Cameras;Robot sensing systems;Voltage control},
 doi={10.1109/SIMPAR.2016.7862386},
 month={Dec},}
+
+@inproceedings{rebecqESIMOpenEvent2018,
+  title = {{{ESIM}}: An Open Event Camera Simulator},
+  booktitle = {Conference on Robot Learning},
+  author = {Rebecq, Henri and Gehrig, Daniel and Scaramuzza, Davide},
+  date = {2018},
+  pages = {969--982},
+  publisher = {PMLR},
+  location = {Zurich, Switzerland},
+  eventtitle = {2nd {{Conference}} on {{Robot Learning}} ({{CoRL}} 2018)},
+  langid = {english},
+}
+
 @article{joubertEventCameraSimulator2021,
   title = {Event Camera Simulator Improvements via Characterized Parameters},
   author = {Joubert, Damien and Marcireau, Alexandre and Ralph, Nic and Jolley, Andrew and family=Schaik, given=André, prefix=van, useprefix=true and Cohen, Gregory},
@@ -149,7 +161,6 @@ month={Dec},}
   url = {https://www.frontiersin.org/articles/10.3389/fnins.2021.702765/full},
   urldate = {2023-02-13},
   langid = {english},
-  annotation = {16 citations (Crossref/title) [2024-07-09]},
 }
 
 ```

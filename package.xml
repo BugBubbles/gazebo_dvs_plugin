@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <package>
   <name>gazebo_dvs_plugin</name>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
   <description>A basic sensor plugin allowing for efficient DVS approximation and event generation.</description>
 
-  <license>TODO</license>
+  <license>GNU</license>
 
-  <maintainer email="hoff@fzi.de">Michael Hoff</maintainer>
+  <maintainer email="holy221aba@gmail.com">Tschen Boffee</maintainer>
   <author email="hoff@fzi.de">Michael Hoff</author>
 
   <buildtool_depend>catkin</buildtool_depend>
