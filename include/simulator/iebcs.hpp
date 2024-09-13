@@ -86,8 +86,8 @@ private:
   void disableNoise();
   void initImg(const double_t *img);
   void masterRst();
-  void checkNoise(const uint64_t dt, std::vector<dvs_msgs::Event> *ev_pk);
+  void checkNoise(uint64_t last_time, const uint64_t dt, std::vector<dvs_msgs::Event> *ev_pk);
   void clamp(double_t &val);
-  void updateImg(const double_t *img, const uint64_t dt, std::vector<dvs_msgs::Event> *ev_pk);
+  void updateImg(const double_t *img, uint64_t last_time, const uint64_t dt, std::vector<dvs_msgs::Event> *ev_pk);
   dvs_msgs::Event Event(uint64_t x, uint64_t y, bool polarity, uint64_t ts);
 };

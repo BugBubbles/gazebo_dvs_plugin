@@ -288,7 +288,7 @@ void IEBCSim::masterRst()
   }
 }
 
-void IEBCSim::checkNoise(const uint64_t dt, std::vector<dvs_msgs::Event> *ev_pk)
+void IEBCSim::checkNoise(uint64_t last_time, const uint64_t dt, std::vector<dvs_msgs::Event> *ev_pk)
 {
   uint64_t next_t = time_ + dt;
   auto nb_ev_before = ev_pk->size();
@@ -296,13 +296,13 @@ void IEBCSim::checkNoise(const uint64_t dt, std::vector<dvs_msgs::Event> *ev_pk)
   {
     if (bgn_pos_next_.at(i) < next_t)
     {
-      ev_pk->push_back(Event(i % height_, i / height_, 1, bgn_pos_next_.at(i)));
+      ev_pk->push_back(Event(i % height_, i / height_, 1, (bgn_pos_next_.at(i) + last_time) * 1e3));
       cur_ref_.at(i) = bgn_pos_next_.at(i);
       this->updateNextNoise(i / height_, i % height_, 1);
     }
     if (bgn_neg_next_.at(i) < next_t)
     {
-      ev_pk->push_back(Event(i % height_, i / height_, 0, bgn_neg_next_.at(i)));
+      ev_pk->push_back(Event(i % height_, i / height_, 0, (bgn_neg_next_.at(i) + last_time) * 1e3));
       cur_ref_.at(i) = bgn_neg_next_.at(i);
       this->updateNextNoise(i / height_, i % height_, 0);
     }
@@ -318,11 +318,11 @@ void IEBCSim::clamp(double_t &val)
     val = 1e4;
 }
 
-void IEBCSim::updateImg(const double_t *img, const uint64_t dt, std::vector<dvs_msgs::Event> *ev_pk)
+void IEBCSim::updateImg(const double_t *img, uint64_t last_time, const uint64_t dt, std::vector<dvs_msgs::Event> *ev_pk)
 {
   double_t img_l, target, amp, lat;
   uint64_t t_event;
-  this->checkNoise(dt, ev_pk);
+  this->checkNoise(last_time, dt, ev_pk);
   for (int i = 0; i < width_ * height_; i++)
   {
     if (img[i] > 0)
@@ -346,7 +346,7 @@ void IEBCSim::updateImg(const double_t *img, const uint64_t dt, std::vector<dvs_
         lat = distribution_lat_(generator_lat_);
         this->clamp(lat);
         t_event = static_cast<double_t>(lat);
-        ev_pk->push_back(Event(i % height_, i / height_, 1, time_px_.at(i) + t_event));
+        ev_pk->push_back(Event(i % height_, i / height_, 1, (time_px_.at(i) + t_event + last_time) * 1e3));
         cur_ref_.at(i) = time_px_.at(i) + t_event + ref_;
         cur_th_pos_.at(i) = std::max(0.0, (double_t)distribution_cur_th_pos_(generator_cur_th_pos_));
         if (cur_ref_.at(i) < time_ + dt)
@@ -364,7 +364,7 @@ void IEBCSim::updateImg(const double_t *img, const uint64_t dt, std::vector<dvs_
         lat = distribution_lat_(generator_lat_);
         this->clamp(lat);
         t_event = static_cast<double_t>(lat);
-        ev_pk->push_back(Event(i % height_, i / height_, 0, time_px_.at(i) + t_event));
+        ev_pk->push_back(Event(i % height_, i / height_, 0, (time_px_.at(i) + t_event + last_time) * 1e3));
         cur_ref_.at(i) = time_px_.at(i) + t_event + ref_;
         cur_th_neg_.at(i) = std::min(0.0, (double_t)distribution_cur_th_neg_(generator_cur_th_neg_));
         if (cur_ref_.at(i) < time_ + dt)
@@ -388,5 +388,5 @@ void IEBCSim::simulateMain(const cv::Mat *last_iamge, const cv::Mat *curr_image,
 {
   this->initImg(last_iamge->ptr<double_t>());
   uint64_t dt_ = (current_time.toNSec() - last_time.toNSec()) / 1e3;
-  this->updateImg(curr_image->ptr<double_t>(), dt_, events);
+  this->updateImg(curr_image->ptr<double_t>(), last_time.toNSec() / 1e3, dt_, events);
 }

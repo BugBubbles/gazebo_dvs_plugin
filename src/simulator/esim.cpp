@@ -36,14 +36,14 @@
 // Constructor
 Esim::Esim()
 {
-  last_time_ = ros::Time::now();
+  // last_time_ = ros::Time::now();
   th_pos_ = 0.3 * DYNAMIC_RANGE, th_neg_ = 0.6 * DYNAMIC_RANGE, th_noise_ = 0.035 * DYNAMIC_RANGE;
   mem_last_image_ = cv::Mat::ones(0, 0, CV_64F);
 }
 
 Esim::Esim(int width, int height, sdf::ElementPtr _sdf)
 {
-  last_time_ = ros::Time::now();
+  // last_time_ = ros::Time::now();
   mem_last_image_ = cv::Mat::ones(width, height, CV_64F);
   th_pos_ = 0.3 * DYNAMIC_RANGE, th_neg_ = 0.6 * DYNAMIC_RANGE, th_noise_ = 0.035 * DYNAMIC_RANGE;
   if (_sdf->HasElement("posThreshold"))
@@ -97,7 +97,7 @@ void Esim::simulateMain(const cv::Mat *last_image, const cv::Mat *curr_image, st
   for (int iter_num = 0; iter_num < static_cast<int>(sample_step); iter_num++)
   {
     // convert to log intensity to store the current image during the interpolation
-    ros::Time ts = last_time_ + ros::Duration(static_cast<double_t>(iter_num) / sample_step * f_time_interval);
+    ros::Time ts = last_time + ros::Duration(static_cast<double_t>(iter_num) / sample_step * f_time_interval);
     mem_last_image_ = mem_last_image_ + slope;
     // *last_image = *curr_image;
     this->processDelta(&mem_last_image_, last_image, ts, events);

@@ -53,7 +53,7 @@ class GAZEBO_VISIBLE Esim : public EventSimulator
   //   static constexpr double_t DYNAMIC_RANGE = 50;
 
 private:
-  ros::Time last_time_;
+  // ros::Time last_time_;
   cv::Mat mem_last_image_;
   // double_t th_pos_, th_neg_, th_noise_;
   std::default_random_engine generator_cur_th_;
